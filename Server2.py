@@ -79,7 +79,7 @@ class Grid:
         
     
 
-    def camp_vide(self, Player):
+    def camp_vide(self, Player): #Le "Player" donné en entrée est l'adversaire
         #Fonction à executer à chaque début de tour d'un joueur
         #Sert à définir s'il faut appliquer la règle de nourrir son adversaire
         s = 0
@@ -145,8 +145,11 @@ class Grid:
 
 
 
-    def fin_du_game(self, Player): # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
+    def fin_du_game(self, Player): #Fonction à lancer à chaque début de tour d'un joueur
+                                   # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
                                    # Return False si un tel coup est possible, et sinon, termine le jeu en remplissant les silos et return True
+        if self.camp_vide(self, Player):
+            self.termination
         s = 0
         for e in Player.liste_cases:
             if self.full_harvest(self, Player, e) == False: #Est-ce-que la fonction full_harvest est exécutée ? 
