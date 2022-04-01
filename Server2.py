@@ -129,9 +129,6 @@ class Grid:
             return False
 
 
-#not indice_dernier_semis >= Player.liste_cases[0] and not indice_dernier_semis <= Player.liste_cases[5]
-
-
 
 
 
