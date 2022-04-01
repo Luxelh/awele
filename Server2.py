@@ -150,8 +150,10 @@ class Grid:
         for e in Player.liste_cases:
             if self.full_harvest(self, Player, e) == False: #Est-ce-que la fonction full_harvest est exécutée ? 
                 s += 1                                      #Si oui il faudra faire une fonction séparée pour check si un coup est jouable
-            if s == 6:
-                self.termination
+        if s == 6:
+            self.termination
+            return False
+        return True
 
 
 
