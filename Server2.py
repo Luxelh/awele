@@ -145,7 +145,7 @@ class Grid:
 
 
 
-    def fin_du_game(self, Player): # Check si le joueur donné en entrée peut joueur un coup qui ne laissera pas vide le camp de son adversaire
+    def fin_du_game(self, Player): # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
         s = 0
         for e in Player.liste_cases:
             if self.full_harvest(self, Player, e) == False: #Est-ce-que la fonction full_harvest est exécutée ? 
