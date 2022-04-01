@@ -1,3 +1,4 @@
+from operator import iconcat
 import sys
 from tabnanny import check
 from time import sleep, localtime
@@ -23,20 +24,26 @@ class Player:
     def set_silo(self,new_value):
         self.silo = new_value
 
+
     def get_silo(self):
         return self.silo
+
+
+
 
 class Case:
     def __init__(self, x):
         self.nb_de_graine = 6
         self.x = x
 
- 
+
     def set_nb_de_graine(self,new_value):
         self.nb_de_graine = new_value
 
+
     def get_nb_de_graine(self):
         return self.nb_de_graine
+
 
 
 
@@ -83,6 +90,8 @@ class Grid:
         else:
            False
 
+
+
     def feed_rule(self,Player):
         if self.camp_vide(self, Player):
             self.needs_feeding = True
@@ -122,22 +131,34 @@ class Grid:
             testcopy[indice_dernier_semis] = 0
             valeur_silo +=x
             indice_dernier_semis -= 1
-        if not self.camp_vide(self, otherPlayer):
+
+        for e in Game.players:   #Game.players == la liste des objets de la classe joueurs ?
+            if Player != e:
+                otherPlayer = e
+
+        if not self.camp_vide(self, otherPlayer): #y a t il une liste des joueurs qq part?
             self.case = copy.deepcopy(testcopy)
             Player.set_silo(valeur_silo)
+
         else:
             return False
 
 
 
+    def fin_du_game(self, Player):
+        for e in Player.liste_cases:
+            if self.full_harvest(self, Player, e) != False: #Est-ce-que la fonction full_harvest est exécutée ? 
+                self.termination                            #Si oui il faudra faire une fonction séparée pour check si un coup est jouable
+                
 
 
-
-
-
-
-
-
-        
-
-
+    def termination (self):
+        #Quand le jeu est terminé (voir la méthode fin_du_game), cette méthode rempli les silos des joueurs avec 
+        #les graines restantes dans leurs camps respectifs
+        s = 0
+        for player in Game.players:  #Game.players == la liste des objets de la classe joueurs ?
+            for e in player.liste_cases:
+                s += self.case[e].get_nb_de_graine()
+            valeur_silo = player.get_silo
+            player.set_silo(valeur_silo + s)
+            s = 0
