@@ -15,8 +15,12 @@ INITIAL = 0
 ACTIVE = 1
 DEAD = -1
 
-WIDTH = 300
-HEIGHT = 300
+CANVAS_WIDTH = 1000
+CANVAS_HEIGHT = 600
+CIRCLE = 120
+INTERVAL = 30
+GAP_X = (CANVAS_WIDTH-(6*CIRCLE+5*INTERVAL))//2
+GAP_Y = 20
 
 ##### class
 
@@ -46,7 +50,7 @@ class Client(ConnectionListener):
         connection.Close()
 
     def Network_disconnected(self, data):
-        print('Server disconnected')
+        print("> Server disconnected")
         exit()
 
     def Network_connectError(self, data):
@@ -59,17 +63,28 @@ class Client(ConnectionListener):
         self.window.set_challengelist(data["player"], data["score"], data["hour"])
 
     def Network_startGame(self, data):
-        self.window.menuNotebook.pack_forget()
+        pass
 
     def Network_endGame(self, data):
-        self.window.menuNotebook.pack(expand=1, fill="both")
+        self.window.grid.refresh([0 for i in range(12)])
+
+    def Network_refresh(self, data):
+        self.window.grid.refresh(data["cases"])
+        nickname = data["turn"]
+        if nickname == self.window.nickname.get(): self.window.turnLabel.config(text="C'est ton tour !")
+        else: self.window.turnLabel.config(text=f"C'est au tour {nickname}")
+        print(f"> Refresh {data}")
+    
+    def Network_preview(self, data):
+        self.window.grid.set_borders("black")
+        self.window.grid.set_border(data["case"], "red")
 
 
 class ClientWindow(Tk):
     def __init__(self, host, port):
         Tk.__init__(self)
         self.title("Awélé")
-        self.resizable(True, True)
+        self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", lambda: self.client.quit())
         self.client = Client(host, int(port), self)
         self.playerState = False
@@ -180,7 +195,9 @@ class ClientWindow(Tk):
 
         self.rulesFrame = Frame(self.menuNotebook)
 
-        self.rulesLabel = Label(self.rulesFrame, text="Règles du jeu :").pack(pady=20)
+        self.ruleLabel = Label(self.rulesFrame, text="Règles du jeu :").pack(pady=20)
+
+        self.rulesLabel = Label(self.rulesFrame, text="").pack(pady=10)
 
         self.rulesFrame.pack()
 
@@ -193,6 +210,19 @@ class ClientWindow(Tk):
 
             ### menuNotebook />
 
+            ### < menuGame
+
+        self.menuGameFrame = Frame(self)
+
+        self.canvas = Canvas(self.menuGameFrame, height=CANVAS_HEIGHT, width=CANVAS_WIDTH, bd="1", bg="#F0F0F0")
+        self.canvas.pack()
+        self.grid = Grid(self, self.canvas)
+
+        self.turnLabel = Label(self.menuGameFrame, text="Vous pouvez lancer une partie !", font=("Arial", 25))
+        self.turnLabel.pack()
+
+            ### menuGame />
+
         ### generalFrame />
 
     ###
@@ -203,9 +233,10 @@ class ClientWindow(Tk):
     ###
 
     def confirm_nickname(self):
-        self.geometry("600x720")
+        self.geometry("1480x720")
         self.connectionFrame.pack_forget()
-        self.generalFrame.pack(padx=20, pady=30)
+        self.menuGameFrame.pack(padx=(0,40), pady=30, side=RIGHT, anchor="c")
+        self.generalFrame.pack(padx=20, pady=30, anchor="c")
 
     def set_leaderboard(self, states, scores):
         for i in self.leaderboardTreeview.get_children(): self.leaderboardTreeview.delete(i)
@@ -223,7 +254,7 @@ class ClientWindow(Tk):
     def askChallenge(self):
         nickname = self.leaderboardTreeview.item(self.leaderboardTreeview.focus())["text"]
         if nickname == self.nickname.get(): 
-            self.challengeLabel.config(justify="center", text="Vous ne pouez pas jouer contre vous-même ! (Faut pas abuser...)")
+            self.challengeLabel.config(justify="center", text="Vous ne pouez pas jouer contre vous-même !\n(Faut pas abuser...)")
         elif self.leaderboardTreeview.item(self.leaderboardTreeview.focus())["values"][1] != "Connecté":
             self.challengeLabel.config(justify="center", text="Ce joueur n'est pas disponible pour un défi !\n(On veut bien mais bonjour l'ambiance...)")
         else:
@@ -233,7 +264,7 @@ class ClientWindow(Tk):
 
     def acceptChallenge(self):
         nickname = self.challengelistTreeview.item(self.challengelistTreeview.focus())["text"]
-        self.client.Send({"action":"acceptChallenge", "player":nickname})
+        self.client.Send({"action":"acceptChallenge", "nickname":nickname})
 
     ###
 
@@ -244,6 +275,45 @@ class ClientWindow(Tk):
             sleep(0.001)
         exit()
 
+
+class Grid:
+    def __init__(self, window, canvas):
+        self.window = window
+        self.canvas = canvas
+        self.grid_img = PhotoImage(file="src/back.png")
+        self.canvas.create_image(1, 1, image=self.grid_img, anchor="nw")
+        self.cases = [Case(self.window, self.canvas, i) for i in range(12)]
+
+    def set_border(self, nb, color):
+        self.cases[nb].set_color(color)
+
+    def set_borders(self, color):
+        for i in range(12): self.set_border(i, color)
+
+    def refresh(self, numbers):
+        for i in range(12):
+            self.cases[i].refresh(numbers[i])
+
+
+class Case:
+    def __init__(self, window, canvas, nb):
+        self.window = window
+        self.canvas = canvas
+        self.nb = nb
+        self.x, self.y = GAP_X+(CIRCLE+INTERVAL)*(lambda x: x if x<6 else 5-(x-6))(self.nb), (CANVAS_HEIGHT//2)+(lambda x: GAP_Y+CIRCLE if x<6 else -GAP_Y)(self.nb)
+        self.dx, self.dy = GAP_X+CIRCLE+(CIRCLE+INTERVAL)*(lambda x: x if x<6 else 5-(x-6))(self.nb), (CANVAS_HEIGHT//2)+(lambda x: GAP_Y if x<6 else -GAP_Y-CIRCLE)(self.nb)
+        self.refresh(0)
+
+    def set_color(self, color):
+        self.circle = self.canvas.create_oval(self.x, self.y, self.dx, self.dy, width=3, outline=color)
+
+    def refresh(self, nb):
+        if nb>20: nb = 20
+        self.current_img = PhotoImage(file=f"src/case{nb}.png")
+        self.case_img = self.canvas.create_image(self.x, self.y, image=self.current_img, anchor="sw")
+        self.circle = self.canvas.create_oval(self.x, self.y, self.dx, self.dy, width=3)
+        self.canvas.tag_bind(self.case_img, "<Button-1>", lambda e: self.window.client.Send({"action":"preview", "case_nb":self.nb}))
+        self.canvas.tag_bind(self.case_img, "<Button-3>", lambda e: self.window.client.Send({"action":"confirmation", "case_nb":self.nb}))
 
 ##### start
 

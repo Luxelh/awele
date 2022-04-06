@@ -2,6 +2,7 @@
 #coding:utf-8
 
 import sys
+import copy
 from tabnanny import check
 from time import sleep, localtime
 from PodSixNet.Server import Server
@@ -9,10 +10,10 @@ from PodSixNet.Channel import Channel
 from random import randint
 from datetime import datetime
 
+
 ##### cst
 
-WIDTH = 9
-HEIGHT = 7
+WIDTH = 12
 
 ONLINE = 1
 ONGAME = 2
@@ -24,6 +25,9 @@ class ClientChannel(Channel):
     nickname = "anonymous"
     color = "red"
     state = False
+    game = None
+    silo = None
+    liste_cases = []
 
     def Close(self):
         self._server.Del_Player(self)
@@ -34,8 +38,32 @@ class ClientChannel(Channel):
     def get_color(self):
         return self.color
 
+    def get_game(self):
+        return self.game
+
+    def get_silo(self):
+        return self.silo
+
+    def get_liste_cases(self):
+        return self.liste_cases
+
     def set_state(self, state):
         self.state = state
+
+    def set_game(self, game):
+        self.game = game
+
+    def set_silo(self, nb):
+        self.silo = nb
+
+    def set_liste_cases(self, l):
+        self.liste_cases = l
+
+    def add_to_silo(self, nb):
+        self.silo += nb
+
+    def in_game(self):
+        return self.game != None
 
     def Network_setNickname(self, data):
         self.nickname = data["nickname"]
@@ -48,10 +76,22 @@ class ClientChannel(Channel):
             self._server.send_leaderboard_to_all()
     
     def Network_askChallenge(self, data):
-        self._server.send_to(data["nickname"], {"action":"askChallenge", "player":self.nickname, "score":self._server.get_score(self.nickname) , "hour":datetime.now().strftime("%H:%M")})
+        try:
+            if self.game == None and self._server.get_states()[data["nickname"]] == ONLINE:
+                self._server.send_to(data["nickname"], {"action":"askChallenge", "player":self.nickname, "score":self._server.get_score(self.nickname) , "hour":datetime.now().strftime("%H:%M")})
+        except: pass
 
     def Network_acceptChallenge(self, data):
-        self._server.new_game(self, self._server.get_player(data["player"]))
+        try:
+            if self.game == None and self._server.get_states()[data["nickname"]] == ONLINE:
+                self._server.new_game(self, self._server.get_player(data["nickname"]))
+        except: pass
+
+    def Network_preview(self, data):
+        if self.in_game(): self.game.previsualization(self, data["case_nb"])
+
+    def Network_confirmation(self, data):
+        if self.in_game(): self.game.confirmation(self, data["case_nb"])
 
 class TheServer(Server):
     channelClass = ClientChannel
@@ -67,6 +107,7 @@ class TheServer(Server):
         self.players[player] = True
 
     def Del_Player(self, player):
+        if player.in_game(): player.get_game().player_quit(player)
         self.states[player.nickname] = OFFLINE
         del self.players[player]
         print(f"> Deleting player : {self.get_states()}")
@@ -126,18 +167,175 @@ class Game:
         self.players = [player1, player2]
         for p in self.players:
             self.server.states[p.nickname] = ONGAME
+            p.set_game(self)
             p.Send({"action":"startGame"})
         self.server.send_leaderboard_to_all()
-        print(f"> Game created : {self.players[0].nickname} vs {self.players[1].nickname}")
-        self.end_Game(self.players[0])
+        self.active_player = self.players[0]
 
-    def end_Game(self, winner):
+        self.grid = Grid(self)
+        for i in range(2):
+            self.players[i].set_silo(0)
+            self.players[i].set_liste_cases(list(range(6*i,7+5*i)))
+
+        self.refresh()
+        print(f"> Game created : {self.players[0].nickname} vs {self.players[1].nickname}")
+
+    def get_players(self):
+        return self.players
+
+    def switch_nb(self, nb):
+        if nb<6: return nb+6
+        return nb-6
+
+    def confirmation(self, player, nb):
+        if player == self.active_player and nb<6:
+            if player == self.players[1]:
+                nb = self.switch_nb(nb)
+            if self.grid.get_cases(0)[nb].get_nb_de_graine():
+                derniere_case = self.grid.previsualization(nb)
+                self.grid.semage(nb)
+                self.grid.full_harvest(player, nb, derniere_case, False)
+                self.switch_player()
+                self.refresh()
+
+    def previsualization(self, player, nb):
+        if player == self.active_player and nb<6:
+            if player == self.players[1]: nb = self.switch_nb(nb)
+            if self.grid.get_cases(0)[nb].get_nb_de_graine():
+                result = self.grid.previsualization(nb)
+                if player == self.players[1]: result = self.switch_nb(result)
+                player.Send({"action":"preview", "case":result})
+
+    def switch_player(self):
+        if self.active_player == self.players[0]: self.active_player = self.players[1]
+        else: self.active_player = self.players[0]
+        self.grid.fin_du_game(self.active_player)
+
+    def refresh(self):
+        for p in range(2):
+            self.players[p].Send({"action":"refresh", "cases":[c.get_nb_de_graine() for c in self.grid.get_cases(p)], "turn":self.active_player.nickname})
+
+    def player_quit(self, player):
+        if self.players[0] == player: del self.players[0]
+        else: del self.players[1]
+        self.end_game(self.players[0])
+
+    def end_game(self, winner):
         for p in self.players:
             self.server.states[p.nickname] = ONLINE
+            p.set_game(None)
             p.Send({"action":"endGame", "winner":winner.nickname})
         self.server.scores[winner.nickname] += 1
         self.server.send_leaderboard_to_all()
         print(f"> Game deleted : {winner.nickname} wins")
+
+
+class Grid:
+    def __init__(self, game):
+        self.game = game
+        self.cases = [Case() for i in range(WIDTH)]
+
+    def get_cases(self, p):
+        if not p: return self.cases
+        return self.cases[6:]+self.cases[:6]
+
+    def semage(self, indice_de_la_case):
+        #effectue la plantation des graine de la case donnée en paramètre
+        i = 0
+        nb_graines_a_semer = self.cases[indice_de_la_case].get_nb_de_graine()
+        self.cases[indice_de_la_case].set_nb_de_graine(0)
+        while i < nb_graines_a_semer:
+            indice_case_a_semer = indice_de_la_case + i + 1
+            if indice_case_a_semer >= 12: #Système pour recommencer à semer du départ si on a atteint la fin de la liste 
+                indice_case_a_semer = indice_case_a_semer - 12      
+            current_nb_graines = self.cases[indice_case_a_semer].get_nb_de_graine()
+            self.cases[indice_case_a_semer].set_nb_de_graine(current_nb_graines + 1)
+            if indice_de_la_case + i + 2 >= 12: #On regarde ce qui se passera au tour d'après si on fait i+=1
+                if indice_case_a_semer - 11 !=  indice_de_la_case:
+                    i += 1
+                else: #Si i+=1 nous fait tomber sur la case de départ, on fait i+=2
+                    i += 2
+            else:
+                i += 1
+
+    def previsualization(self, indice_de_la_case):
+        nb = indice_de_la_case + self.cases[indice_de_la_case].get_nb_de_graine()
+        while nb >= 12: nb -= 12
+        return nb
+
+    def full_harvest(self, player, premiere_case, derniere_case, test):
+        #Effectue la récolte si possible, renvoie False si la récolte est impossible car le camp de l'adversaire serait vide
+        silo = player.get_silo()
+        testcopy = copy.deepcopy(self.cases)
+        while derniere_case not in player.get_liste_cases() and derniere_case >= 0 and self.harvest_possible(derniere_case):
+            silo += testcopy[derniere_case].get_nb_de_graine()
+            testcopy[derniere_case].set_nb_de_graine(0)
+            derniere_case -= 1
+
+        for e in self.game.get_players():   #Game.players == la liste des objets de la classe joueurs ?
+            if player != e:
+                otherPlayer = e
+
+        if not self.camp_vide(otherPlayer) and not test:
+            self.cases = copy.deepcopy(testcopy)
+            player.set_silo(silo)
+        elif not self.camp_vide(otherPlayer) and test:
+            return True
+        elif self.camp_vide(otherPlayer) and test:
+            return False
+
+    def harvest_possible(self, indice_de_la_case):
+        #Check si la récolte est possible dans une case dont l'indice est donné en paramètre, renvoie True ou False
+        return self.cases[indice_de_la_case].get_nb_de_graine()>1 and self.cases[indice_de_la_case].get_nb_de_graine()<4
+
+    def camp_vide(self, player): #Le "Player" donné en entrée est l'adversaire
+        #Fonction à executer à chaque début de tour d'un joueur
+        #Sert à définir s'il faut appliquer la règle de nourrir son adversaire
+        s = 0
+        for e in player.get_liste_cases():
+            s += self.cases[e].get_nb_de_graine()
+        if s == 0:
+            return True
+        return False
+
+    def fin_du_game(self, player): #Fonction à lancer à chaque début de tour d'un joueur
+                                   # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
+                                   # Return False si un tel coup est possible, et sinon, termine le jeu en remplissant les silos et return True
+        if self.camp_vide(player):
+            self.termination()
+        s = 0
+        for e in player.liste_cases:
+            if self.full_harvest(player, e, self.previsualization(e), True) == False:
+                s += 1
+        if s == 6:
+            self.termination()
+            return True
+        return False
+
+    def termination (self):
+        #Quand le jeu est terminé (voir la méthode fin_du_game), cette méthode rempli les silos des joueurs avec 
+        #les graines restantes dans leurs camps respectifs
+        s = 0
+        for player in self.game.get_players():
+            for e in player.get_liste_cases():
+                s += self.cases[e].get_nb_de_graine()
+            valeur_silo = player.get_silo()
+            player.set_silo(valeur_silo + s)
+            s = 0
+        
+        if self.game.get_players()[0].get_silo() > self.game.get_players()[1].get_silo(): self.game.end_game(self.game.get_players()[0])
+        else: self.game.end_game(self.game.get_players()[1])
+
+    
+class Case:
+    def __init__(self):
+        self.nb_de_graine = 6
+
+    def get_nb_de_graine(self):
+        return self.nb_de_graine
+
+    def set_nb_de_graine(self, new_value):
+        self.nb_de_graine = new_value
 
 
 ##### start
