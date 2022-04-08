@@ -66,7 +66,13 @@ class Client(ConnectionListener):
         pass
 
     def Network_endGame(self, data):
+        nickname = data["winner"]
+        if nickname == self.window.nickname: self.window.turnLabel.config(text="Vous avez gagné !")
+        else: self.window.turnLabel.config(text=f"Aïe, {nickname} a gagné ... ")
         self.window.grid.refresh([0 for i in range(12)])
+
+    def Network_impossible(self, data):
+        self.window.turnLabel.config(text="Vous devez nourrir votre adversaire !")
 
     def Network_refresh(self, data):
         self.window.grid.refresh(data["cases"])
@@ -308,7 +314,7 @@ class Case:
         self.circle = self.canvas.create_oval(self.x, self.y, self.dx, self.dy, width=3, outline=color)
 
     def refresh(self, nb):
-        if nb>20: nb = 20
+        if nb>20: nb=20
         self.current_img = PhotoImage(file=f"src/case{nb}.png")
         self.case_img = self.canvas.create_image(self.x, self.y, image=self.current_img, anchor="sw")
         self.circle = self.canvas.create_oval(self.x, self.y, self.dx, self.dy, width=3)

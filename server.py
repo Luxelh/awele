@@ -147,7 +147,7 @@ class TheServer(Server):
     ### send fct
 
     def send_to(self, nickname, data):
-        [p.Send(data) for p in self.players if p.nickname is nickname]
+        [p.Send(data) for p in self.players if nickname == p.get_nickname()]
 
     def send_to_all(self, data):
         [p.Send(data) for p in self.players]
@@ -175,7 +175,7 @@ class Game:
         self.grid = Grid(self)
         for i in range(2):
             self.players[i].set_silo(0)
-            self.players[i].set_liste_cases(list(range(6*i,7+5*i)))
+            self.players[i].set_liste_cases(list(range(6*i,6+6*i)))
 
         self.refresh()
         print(f"> Game created : {self.players[0].nickname} vs {self.players[1].nickname}")
@@ -193,10 +193,13 @@ class Game:
                 nb = self.switch_nb(nb)
             if self.grid.get_cases(0)[nb].get_nb_de_graine():
                 derniere_case = self.grid.previsualization(nb)
-                self.grid.semage(nb)
-                self.grid.full_harvest(player, nb, derniere_case, False)
-                self.switch_player()
-                self.refresh()
+                if not self.grid.full_harvest(player, nb, derniere_case, True):
+                    player.Send({"action":"impossible"})
+                else:
+                    self.grid.semage(nb)
+                    self.grid.full_harvest(player, nb, derniere_case, False)
+                    self.switch_player()
+                    self.refresh()
 
     def previsualization(self, player, nb):
         if player == self.active_player and nb<6:
@@ -209,7 +212,7 @@ class Game:
     def switch_player(self):
         if self.active_player == self.players[0]: self.active_player = self.players[1]
         else: self.active_player = self.players[0]
-        self.grid.fin_du_game(self.active_player)
+        if self.grid.fin_du_game(self.active_player): self.grid.termination()
 
     def refresh(self):
         for p in range(2):
@@ -246,22 +249,25 @@ class Grid:
         self.cases[indice_de_la_case].set_nb_de_graine(0)
         while i < nb_graines_a_semer:
             indice_case_a_semer = indice_de_la_case + i + 1
-            if indice_case_a_semer >= 12: #Système pour recommencer à semer du départ si on a atteint la fin de la liste 
-                indice_case_a_semer = indice_case_a_semer - 12      
+            while indice_case_a_semer >= 12: #Système pour recommencer à semer du départ si on a atteint la fin de la liste 
+                indice_case_a_semer -= 12 
             current_nb_graines = self.cases[indice_case_a_semer].get_nb_de_graine()
             self.cases[indice_case_a_semer].set_nb_de_graine(current_nb_graines + 1)
-            if indice_de_la_case + i + 2 >= 12: #On regarde ce qui se passera au tour d'après si on fait i+=1
-                if indice_case_a_semer - 11 !=  indice_de_la_case:
-                    i += 1
-                else: #Si i+=1 nous fait tomber sur la case de départ, on fait i+=2
-                    i += 2
-            else:
-                i += 1
+            prochain_indice_case_a_semer = indice_case_a_semer + 1
+            while prochain_indice_case_a_semer >=12: prochain_indice_case_a_semer -= 12
+            if prochain_indice_case_a_semer == indice_de_la_case: i += 2
+            else: i+= 1
+        
 
     def previsualization(self, indice_de_la_case):
         nb = indice_de_la_case + self.cases[indice_de_la_case].get_nb_de_graine()
         while nb >= 12: nb -= 12
         return nb
+
+    def camp_vide(self, player): #Le "Player" donné en entrée est l'adversaire
+        #Fonction à executer à chaque début de tour d'un joueur
+        #Sert à définir s'il faut appliquer la règle de nourrir son adversaire
+        return sum([self.cases[i].get_nb_de_graine() for i in player.get_liste_cases()]) == 0
 
     def full_harvest(self, player, premiere_case, derniere_case, test):
         #Effectue la récolte si possible, renvoie False si la récolte est impossible car le camp de l'adversaire serait vide
@@ -272,7 +278,7 @@ class Grid:
             testcopy[derniere_case].set_nb_de_graine(0)
             derniere_case -= 1
 
-        for e in self.game.get_players():   #Game.players == la liste des objets de la classe joueurs ?
+        for e in self.game.get_players(): #Game.players == la liste des objets de la classe joueurs ?
             if player != e:
                 otherPlayer = e
 
@@ -288,31 +294,15 @@ class Grid:
         #Check si la récolte est possible dans une case dont l'indice est donné en paramètre, renvoie True ou False
         return self.cases[indice_de_la_case].get_nb_de_graine()>1 and self.cases[indice_de_la_case].get_nb_de_graine()<4
 
-    def camp_vide(self, player): #Le "Player" donné en entrée est l'adversaire
-        #Fonction à executer à chaque début de tour d'un joueur
-        #Sert à définir s'il faut appliquer la règle de nourrir son adversaire
-        s = 0
-        for e in player.get_liste_cases():
-            s += self.cases[e].get_nb_de_graine()
-        if s == 0:
-            return True
-        return False
-
     def fin_du_game(self, player): #Fonction à lancer à chaque début de tour d'un joueur
                                    # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
                                    # Return False si un tel coup est possible, et sinon, termine le jeu en remplissant les silos et return True
-        if self.camp_vide(player):
-            self.termination()
-        s = 0
-        for e in player.liste_cases:
-            if self.full_harvest(player, e, self.previsualization(e), True) == False:
-                s += 1
-        if s == 6:
-            self.termination()
-            return True
-        return False
+        if self.camp_vide(player): return True
+        for i in player.get_liste_cases():
+            if self.full_harvest(player, i, self.previsualization(i), True): return False
+        return True
 
-    def termination (self):
+    def termination(self):
         #Quand le jeu est terminé (voir la méthode fin_du_game), cette méthode rempli les silos des joueurs avec 
         #les graines restantes dans leurs camps respectifs
         s = 0
@@ -329,7 +319,7 @@ class Grid:
     
 class Case:
     def __init__(self):
-        self.nb_de_graine = 6
+        self.nb_de_graine = 2
 
     def get_nb_de_graine(self):
         return self.nb_de_graine
