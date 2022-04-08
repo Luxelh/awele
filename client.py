@@ -20,7 +20,7 @@ CANVAS_HEIGHT = 600
 CIRCLE = 120
 INTERVAL = 30
 GAP_X = (CANVAS_WIDTH-(6*CIRCLE+5*INTERVAL))//2
-GAP_Y = 20
+GAP_Y = 10
 
 ##### class
 
@@ -67,15 +67,15 @@ class Client(ConnectionListener):
 
     def Network_endGame(self, data):
         nickname = data["winner"]
-        if nickname == self.window.nickname: self.window.turnLabel.config(text="Vous avez gagné !")
+        if nickname == self.window.nickname.get(): self.window.turnLabel.config(text="Vous avez gagné !")
         else: self.window.turnLabel.config(text=f"Aïe, {nickname} a gagné ... ")
-        self.window.grid.refresh([0 for i in range(12)])
 
     def Network_impossible(self, data):
         self.window.turnLabel.config(text="Vous devez nourrir votre adversaire !")
 
     def Network_refresh(self, data):
-        self.window.grid.refresh(data["cases"])
+        print(data["silos"])
+        self.window.grid.refresh(data["cases"], data["silos"])
         nickname = data["turn"]
         if nickname == self.window.nickname.get(): self.window.turnLabel.config(text="C'est ton tour !")
         else: self.window.turnLabel.config(text=f"C'est au tour {nickname}")
@@ -289,6 +289,9 @@ class Grid:
         self.grid_img = PhotoImage(file="src/back.png")
         self.canvas.create_image(1, 1, image=self.grid_img, anchor="nw")
         self.cases = [Case(self.window, self.canvas, i) for i in range(12)]
+        self.silosLabel = []
+        self.silosLabel.append(self.canvas.create_text(CANVAS_WIDTH//2+280, CANVAS_HEIGHT//2+200, text=f"Silo : 0", fill="black", font=('Arial 40')))
+        self.silosLabel.append(self.canvas.create_text(CANVAS_WIDTH//2-280, CANVAS_HEIGHT//2-200, text=f"Silo : 0", fill="black", font=('Arial 40')))
 
     def set_border(self, nb, color):
         self.cases[nb].set_color(color)
@@ -296,7 +299,9 @@ class Grid:
     def set_borders(self, color):
         for i in range(12): self.set_border(i, color)
 
-    def refresh(self, numbers):
+    def refresh(self, numbers, silos):
+        for i in range(2):
+            self.canvas.itemconfig(self.silosLabel[i], text=f"Silo : {silos[i]}")
         for i in range(12):
             self.cases[i].refresh(numbers[i])
 

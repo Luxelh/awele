@@ -93,6 +93,7 @@ class ClientChannel(Channel):
     def Network_confirmation(self, data):
         if self.in_game(): self.game.confirmation(self, data["case_nb"])
 
+
 class TheServer(Server):
     channelClass = ClientChannel
     def __init__(self, localaddr):
@@ -199,7 +200,7 @@ class Game:
                     self.grid.semage(nb)
                     self.grid.full_harvest(player, nb, derniere_case, False)
                     self.switch_player()
-                    self.refresh()
+                    if player.get_game(): self.refresh()
 
     def previsualization(self, player, nb):
         if player == self.active_player and nb<6:
@@ -216,7 +217,7 @@ class Game:
 
     def refresh(self):
         for p in range(2):
-            self.players[p].Send({"action":"refresh", "cases":[c.get_nb_de_graine() for c in self.grid.get_cases(p)], "turn":self.active_player.nickname})
+            self.players[p].Send({"action":"refresh", "cases":[c.get_nb_de_graine() for c in self.grid.get_cases(p)], "turn":self.active_player.nickname, "silos":self.grid.get_silos(self.players[p])})
 
     def player_quit(self, player):
         if self.players[0] == player: del self.players[0]
@@ -241,6 +242,10 @@ class Grid:
     def get_cases(self, p):
         if not p: return self.cases
         return self.cases[6:]+self.cases[:6]
+
+    def get_silos(self, p):
+        if p == self.game.players[0]: return [self.game.players[0].get_silo(), self.game.players[1].get_silo()]
+        return [self.game.players[1].get_silo(), self.game.players[0].get_silo()]
 
     def semage(self, indice_de_la_case):
         #effectue la plantation des graine de la case donnée en paramètre
