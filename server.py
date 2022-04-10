@@ -283,16 +283,16 @@ class Grid:
             testcopy[derniere_case].set_nb_de_graine(0)
             derniere_case -= 1
 
-        for e in self.game.get_players(): #Game.players == la liste des objets de la classe joueurs ?
+        for e in self.game.get_players():
             if player != e:
                 otherPlayer = e
 
         if not self.camp_vide(otherPlayer) and not test:
             self.cases = copy.deepcopy(testcopy)
             player.set_silo(silo)
-        elif not sum([testcopy[i].get_nb_de_graine() for i in player.get_liste_cases()]) == 0 and test:
+        elif not sum([testcopy[i].get_nb_de_graine() for i in otherPlayer.get_liste_cases()]) == 0 and test:
             return True
-        elif sum([testcopy[i].get_nb_de_graine() for i in player.get_liste_cases()]) == 0 and test:
+        elif sum([testcopy[i].get_nb_de_graine() for i in otherPlayer.get_liste_cases()]) == 0 and test:
             return False
 
     def harvest_possible(self, indice_de_la_case):
@@ -302,6 +302,7 @@ class Grid:
     def fin_du_game(self, player): #Fonction à lancer à chaque début de tour d'un joueur
                                    # Check si le joueur donné en entrée peut jouer un coup qui ne laissera pas vide le camp de son adversaire
                                    # Return False si un tel coup est possible, et sinon, termine le jeu en remplissant les silos et return True
+    
         if self.camp_vide(player): return True
         for i in player.get_liste_cases():
             if self.full_harvest(player, i, self.previsualization(i), True): return False
@@ -310,6 +311,10 @@ class Grid:
     def termination(self):
         #Quand le jeu est terminé (voir la méthode fin_du_game), cette méthode rempli les silos des joueurs avec 
         #les graines restantes dans leurs camps respectifs
+        for i in self.cases:
+            self.game.active_player.add_to_silo(i.get_nb_de_graine())
+            i.set_nb_de_graine(0)
+        self.game.refresh()
         s = 0
         for player in self.game.get_players():
             for e in player.get_liste_cases():
