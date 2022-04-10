@@ -290,9 +290,9 @@ class Grid:
         if not self.camp_vide(otherPlayer) and not test:
             self.cases = copy.deepcopy(testcopy)
             player.set_silo(silo)
-        elif not self.camp_vide(otherPlayer) and test:
+        elif not sum([testcopy[i].get_nb_de_graine() for i in player.get_liste_cases()]) == 0 and test:
             return True
-        elif self.camp_vide(otherPlayer) and test:
+        elif sum([testcopy[i].get_nb_de_graine() for i in player.get_liste_cases()]) == 0 and test:
             return False
 
     def harvest_possible(self, indice_de_la_case):
@@ -324,7 +324,7 @@ class Grid:
     
 class Case:
     def __init__(self):
-        self.nb_de_graine = 6
+        self.nb_de_graine = 2
 
     def get_nb_de_graine(self):
         return self.nb_de_graine
