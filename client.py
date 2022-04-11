@@ -206,7 +206,12 @@ class ClientWindow(Tk):
 
         self.ruleLabel = Label(self.rulesFrame, text="Règles du jeu :").pack(pady=20)
 
-        self.rulesLabel = Label(self.rulesFrame, text="").pack(pady=10)
+        self.rulesLabel = []
+        self.rulesLabel.append(Label(self.rulesFrame, text="Le but du jeu est de récolter plus de graines dans son silo\n que l’adversaire.").pack(pady=10))
+        self.rulesLabel.append(Label(self.rulesFrame, text="- A chaque tour, le joueur dont c’est le tour choisi une case\n parmi les 6 qu’il a de son côté et va les semer.\n Le joueur ne peut pas choisir dans quelles cases il va\n semer ses graines, ces dernières sont semées\n une par une dans le sens antihoraire.\n Si le joueur fait un clic gauche sur une case, il prévisualise\n dans quelle case sa dernière graine sera semée, s’il fait\n un clic droit le coup est joué.").pack(pady=10))
+        self.rulesLabel.append(Label(self.rulesFrame, text="- Ensuite on regarde la dernière case dans laquelle le\n joueur a semé, si elle appartient au camp adverse et si\n elle comporte maintenant 2 ou 3 graines, le joueur récolte\n ces graines pour son silo personnel.").pack(pady=10))
+        self.rulesLabel.append(Label(self.rulesFrame, text="- Si une récolte a été effectuée sur la dernière case dans\n laquelle le joueur a semé, on regarde l’avant-dernière\n case et une récolte peut être effectuée aux mêmes\n conditions que précédemment, ainsi de suite jusqu’à\n ce que la récolte ne soit plus possible.").pack(pady=10))
+        self.rulesLabel.append(Label(self.rulesFrame, text="- Le jeu s’arrête dès que le camp d’un des joueurs est vide.\n Les graines restantes sur le plateau sont ajoutées au silo\n de l’autre joueur.").pack(pady=10))
 
         self.rulesFrame.pack()
 
