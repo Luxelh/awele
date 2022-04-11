@@ -233,6 +233,14 @@ class Game:
         self.server.send_leaderboard_to_all()
         print(f"> Game deleted : {winner.nickname} wins")
 
+    def end_game_equal(self):
+        for p in self.players:
+            self.server.states[p.nickname] = ONLINE
+            p.set_game(None)
+            p.Send({"action":"endGameEqual"})
+        self.server.send_leaderboard_to_all()
+        print(f"> Game deleted : same score")
+
 
 class Grid:
     def __init__(self, game):
@@ -323,7 +331,8 @@ class Grid:
             player.set_silo(valeur_silo + s)
             s = 0
         
-        if self.game.get_players()[0].get_silo() > self.game.get_players()[1].get_silo(): self.game.end_game(self.game.get_players()[0])
+        if self.game.get_players()[0].get_silo() == self.game.get_players()[1].get_silo(): self.game.end_game_equal()
+        elif self.game.get_players()[0].get_silo() > self.game.get_players()[1].get_silo(): self.game.end_game(self.game.get_players()[0])
         else: self.game.end_game(self.game.get_players()[1])
 
     

@@ -70,6 +70,9 @@ class Client(ConnectionListener):
         if nickname == self.window.nickname.get(): self.window.turnLabel.config(text="Vous avez gagné !")
         else: self.window.turnLabel.config(text=f"Aïe, {nickname} a gagné ... ")
 
+    def Network_endGameEqual(self, data):
+        self.window.turnLabel.config(text="Égalité !")
+
     def Network_impossible(self, data):
         self.window.turnLabel.config(text="Vous devez nourrir votre adversaire !")
 
@@ -78,7 +81,7 @@ class Client(ConnectionListener):
         self.window.grid.refresh(data["cases"], data["silos"])
         nickname = data["turn"]
         if nickname == self.window.nickname.get(): self.window.turnLabel.config(text="C'est ton tour !")
-        else: self.window.turnLabel.config(text=f"C'est au tour {nickname}")
+        else: self.window.turnLabel.config(text=f"C'est au tour de {nickname}")
         print(f"> Refresh {data}")
     
     def Network_preview(self, data):
