@@ -338,7 +338,7 @@ class Grid:
     
 class Case:
     def __init__(self):
-        self.nb_de_graine = 2
+        self.nb_de_graine = 6
 
     def get_nb_de_graine(self):
         return self.nb_de_graine
